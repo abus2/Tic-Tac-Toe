@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced Tic-Tac-Toe - Game Modes</title>
+  <style>
+    body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: #f4f4f4;
+    transition: background 0.3s;
+  }
+
+  .container {
+    text-align: center;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    width: 90%;
+    max-width: 600px;
+  }
+
+  h1 {
+    margin-bottom: 10px;
+  }
+
+  .game-board {
+    display: grid;
+    grid-template-columns: repeat(var(--board-size, 3), 1fr);
+    grid-gap: 5px;
+    margin-bottom: 20px;
+  }
+
+  .cell {
+    width: 70px;
+    height: 70px;
+    background: var(--cell-bg-color, #f9f9f9);
+    border: 2px solid #ccc;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.3s;
+  }
+
+  .cell.taken {
+    cursor: not-allowed;
+  }
+
+  .game-info, .settings {
+    margin-bottom: 10px;
+  }
+
+  button {
+    padding: 10px 15px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin: 5px;
+  }
+
+  button:hover {
+    background: #0056b3;
+  }
+
+  input[type="color"] {
+    margin-left: 10px;
+  }
+
+  .win-history {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    text-align: left;
+  }
+
+  .dark-mode {
+    background: #222;
+    color: #fff;
+  }
+
+  .dark-mode .container {
+    background: #333;
+  }
+
+  .dark-mode .cell {
+    background: #555;
+    color: #fff;
+  }
+  </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced Tic-Tac-Toe</h1>
+        <div class="game-info">
+          <p id="status">Player X's turn</p>
+          <p id="score">X: 0 | O: 0 | Draws: 0</p>
+          <p id="timer">Timer: 0 seconds</p>
+        </div>
+        <div class="settings">
+          <label for="board-size">Board Size:</label>
+          <input type="number" id="board-size" value="3" min="3" max="10">
+          <button id="apply-board-size">Apply</button>
+          <br>
+          <label for="color-picker">Change Theme:</label>
+          <input type="color" id="color-picker">
+          <button id="reset-theme">Reset Theme</button>
+        </div>
+        <label for="difficulty">AI Difficulty:</label>
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+        <div class="game-board" id="game-board"></div>
+        <div>
+          <button id="restart">Restart Game</button>
+          <button id="reset-scores">Reset Scores</button>
+          <button id="reset-history">Reset History</button>
+          <button id="toggle-theme">Toggle Dark Mode</button>
+          <button id="pause-timer">Pause Timer</button>
+          <button id="undo-move">Undo Move</button>
+          <button id="resume-timer">Resume Timer</button>
+        </div>
+        <div class="win-history" id="win-history">
+          <h3>Win History:</h3>
+        </div>
+      </div>
+    
+  <script>
+const boardContainer = document.getElementById("game-board");
+const boardSizeInput = document.getElementById("board-size");
+const applyBoardSizeBtn = document.getElementById("apply-board-size");
+const statusText = document.getElementById("status");
+const scoreText = document.getElementById("score");
+const timerText = document.getElementById("timer");
+const restartBtn = document.getElementById("restart");
+const resetScoresBtn = document.getElementById("reset-scores");
+const resetHistoryBtn = document.getElementById("reset-history");
+const toggleThemeBtn = document.getElementById("toggle-theme");
+const pauseTimerBtn = document.getElementById("pause-timer");
+const resumeTimerBtn = document.getElementById("resume-timer");
+const colorPicker = document.getElementById("color-picker");
+const resetThemeBtn = document.getElementById("reset-theme");
+const undoMoveBtn = document.getElementById("undo-move");
+const winHistory = document.getElementById("win-history");
+
+let boardSize = 3;
+let currentPlayer = "X";
+let board = [];
+let gameActive = true;
+let scores = { X: 0, O: 0, Draws: 0 };
+let timer = 0;
+let timerInterval;
+let darkMode = false;
+
+function createBoard(size) {
+  boardContainer.style.setProperty("--board-size", size);
+  boardContainer.innerHTML = "";
+  board = Array(size * size).fill("");
+  for (let i = 0; i < size * size; i++) {
+    const cell = document.createElement("div");
+    cell.classList.add("cell");
+    cell.setAttribute("data-index", i);
+    cell.addEventListener("click", handleCellClick);
+    boardContainer.appendChild(cell);
+  }
+}
+
+function handleCellClick(event) {
+  const cell = event.target;
+  const index = cell.getAttribute("data-index");
+
+  if (board[index] !== "" || !gameActive) return;
+
+  board[index] = currentPlayer;
+  cell.textContent = currentPlayer;
+  cell.classList.add("taken");
+
+  if (checkWin()) {
+    statusText.textContent = `${currentPlayer} wins!`;
+    scores[currentPlayer]++;
+    updateScore();
+    logWin(currentPlayer);
+    stopTimer();
+    gameActive = false;
+  } else if (board.includes("")) {
+    currentPlayer = currentPlayer === "X" ? "O" : "X";
+    statusText.textContent = `Player ${currentPlayer}'s turn`;
+  } else {
+    statusText.textContent = "It's a draw!";
+    scores.Draws++;
+    updateScore();
+    stopTimer();
+    gameActive = false;
+  }
+}
+
+
+
+
+function checkWin() {
+  const winningConditions = generateWinningConditions(boardSize);
+  return winningConditions.some((condition) =>
+    condition.every((index) => board[index] === currentPlayer)
+  );
+}
+
+function generateWinningConditions(size) {
+  const conditions = [];
+
+  // Rows and Columns
+  for (let i = 0; i < size; i++) {
+    const row = [];
+    const col = [];
+    for (let j = 0; j < size; j++) {
+      row.push(i * size + j);
+      col.push(j * size + i);
+    }
+    conditions.push(row, col);
+  }
+
+  // Diagonals
+  const diagonal1 = [];
+  const diagonal2 = [];
+  for (let i = 0; i < size; i++) {
+    diagonal1.push(i * size + i);
+    diagonal2.push(i * size + (size - i - 1));
+  }
+  conditions.push(diagonal1, diagonal2);
+
+  return conditions;
+}
+
+function restartGame() {
+  createBoard(boardSize);
+  currentPlayer = "X";
+  gameActive = true;
+  statusText.textContent = "Player X's turn";
+  resetTimer();
+  startTimer();
+}
+
+function updateScore() {
+  scoreText.textContent = `X: ${scores.X} | O: ${scores.O} | Draws: ${scores.Draws}`;
+}
+
+function resetScores() {
+  scores = { X: 0, O: 0, Draws: 0 };
+  updateScore();
+  restartGame();
+}
+
+function logWin(player) {
+  const log = document.createElement("p");
+  log.textContent = `Player ${player} won!`;
+  winHistory.appendChild(log);
+}
+
+function resetHistory() {
+  winHistory.innerHTML = "<h3>Win History:</h3>";
+}
+
+function toggleTheme() {
+  darkMode = !darkMode;
+  document.body.classList.toggle("dark-mode", darkMode);
+}
+
+function startTimer() {
+  timer = 0;
+  timerInterval = setInterval(() => {
+    timer++;
+    timerText.textContent = `Timer: ${timer} seconds`;
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+}
+
+function resetTimer() {
+  stopTimer();
+  timer = 0;
+  timerText.textContent = "Timer: 0 seconds";
+}
+
+colorPicker.addEventListener("input", (e) => {
+  document.documentElement.style.setProperty("--cell-bg-color", e.target.value);
+});
+
+resetThemeBtn.addEventListener("click", () => {
+  document.documentElement.style.setProperty("--cell-bg-color", "#f9f9f9");
+});
+
+pauseTimerBtn.addEventListener("click", stopTimer);
+resumeTimerBtn.addEventListener("click", startTimer);
+
+applyBoardSizeBtn.addEventListener("click", () => {
+  boardSize = parseInt(boardSizeInput.value) || 3;
+  restartGame();
+});
+
+restartBtn.addEventListener("click", restartGame);
+resetScoresBtn.addEventListener("click", resetScores);
+resetHistoryBtn.addEventListener("click", resetHistory);
+toggleThemeBtn.addEventListener("click", toggleTheme);
+
+createBoard(boardSize);
+startTimer();
+
+
+
+
+
+
+
+
+
+
+
+
+const soundMove = new Audio('move-sound.mp3');
+const soundWin = new Audio('win-sound.mp3');
+const soundDraw = new Audio('draw-sound.mp3');
+let aiDifficulty = "easy"; 
+
+function createBoard(size) {
+  boardContainer.style.setProperty("--board-size", size);
+  boardContainer.innerHTML = "";
+  board = Array(size * size).fill("");
+  moveHistory = [];
+  for (let i = 0; i < size * size; i++) {
+    const cell = document.createElement("div");
+    cell.classList.add("cell");
+    cell.setAttribute("data-index", i);
+    cell.addEventListener("click", handleCellClick);
+    boardContainer.appendChild(cell);
+  }
+}
+
+function handleCellClick(event) {
+  const cell = event.target;
+  const index = cell.getAttribute("data-index");
+
+  if (board[index] !== "" || !gameActive) return;
+
+  board[index] = currentPlayer;
+  cell.textContent = currentPlayer;
+  cell.classList.add("taken");
+  moveHistory.push({ player: currentPlayer, index });
+
+  soundMove.play();
+
+  if (checkWin()) {
+    soundWin.play();
+    statusText.textContent = `${currentPlayer} wins!`;
+    scores[currentPlayer]++;
+    updateScore();
+    logWin(currentPlayer);
+    stopTimer();
+    gameActive = false;
+  } else if (board.includes("")) {
+    currentPlayer = currentPlayer === "X" ? "O" : "X";
+    statusText.textContent = `Player ${currentPlayer}'s turn`;
+    if (isComputerOpponent && currentPlayer === "O") {
+      setTimeout(computerMove, 1000);
+    }
+  } else {
+    soundDraw.play();
+    statusText.textContent = "It's a draw!";
+    scores.Draws++;
+    updateScore();
+    stopTimer();
+    gameActive = false;
+  }
+}
+
+function undoMove() {
+  const lastMove = moveHistory.pop();
+  if (lastMove) {
+    const { index } = lastMove;
+    board[index] = "";
+    const cell = boardContainer.children[index];
+    cell.textContent = "";
+    cell.classList.remove("taken");
+    currentPlayer = lastMove.player === "X" ? "O" : "X"; // Switch back the player
+    statusText.textContent = `Player ${currentPlayer}'s turn`;
+  }
+}
+
+function computerMove() {
+  const emptyCells = board
+    .map((value, index) => (value === "" ? index : -1))
+    .filter(index => index !== -1);
+  let randomIndex;
+  
+  if (aiDifficulty === "easy") {
+    randomIndex = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+  } else {
+    // Add logic for medium and hard AI difficulty
+  }
+
+  board[randomIndex] = "O";
+  const cell = boardContainer.children[randomIndex];
+  cell.textContent = "O";
+  cell.classList.add("taken");
+
+  if (checkWin()) {
+    soundWin.play();
+    statusText.textContent = "Player O wins!";
+    scores.O++;
+    updateScore();
+    logWin("O");
+    stopTimer();
+    gameActive = false;
+  } else {
+    currentPlayer = "X";
+    statusText.textContent = "Player X's turn";
+  }
+}
+
+function checkWin() {
+  const winningConditions = generateWinningConditions(boardSize);
+  return winningConditions.some((condition) =>
+    condition.every((index) => board[index] === currentPlayer)
+  );
+}
+
+function generateWinningConditions(size) {
+  const conditions = [];
+  for (let i = 0; i < size; i++) {
+    const row = [];
+    const col = [];
+    for (let j = 0; j < size; j++) {
+      row.push(i * size + j);
+      col.push(j * size + i);
+    }
+    conditions.push(row, col);
+  }
+  const diagonal1 = [];
+  const diagonal2 = [];
+  for (let i = 0; i < size; i++) {
+    diagonal1.push(i * size + i);
+    diagonal2.push(i * size + (size - i - 1));
+  }
+  conditions.push(diagonal1, diagonal2);
+  return conditions;
+}
+
+function restartGame() {
+  createBoard(boardSize);
+  currentPlayer = "X";
+  gameActive = true;
+  statusText.textContent = "Player X's turn";
+  resetTimer();
+  startTimer();
+}
+
+function updateScore() {
+  scoreText.textContent = `X: ${scores.X} | O: ${scores.O} | Draws: ${scores.Draws}`;
+}
+
+function logWin(player) {
+  const log = document.createElement("p");
+  log.textContent = `Player ${player} won!`;
+  winHistory.appendChild(log);
+}
+
+function resetHistory() {
+  winHistory.innerHTML = "<h3>Win History:</h3>";
+}
+
+function toggleTheme() {
+  darkMode = !darkMode;
+  document.body.classList.toggle("dark-mode", darkMode);
+}
+
+function startTimer() {
+  timer = 0;
+  timerInterval = setInterval(() => {
+    timer++;
+    timerText.textContent = `Timer: ${timer} seconds`;
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+}
+
+function resetTimer() {
+  stopTimer();
+  timer = 0;
+  timerText.textContent = "Timer: 0 seconds";
+}
+
+colorPicker.addEventListener("input", (e) => {
+  document.documentElement.style.setProperty("--cell-bg-color", e.target.value);
+});
+
+resetThemeBtn.addEventListener("click", () => {
+  document.documentElement.style.setProperty("--cell-bg-color", "#f9f9f9");
+});
+
+pauseTimerBtn.addEventListener("click", stopTimer);
+resumeTimerBtn.addEventListener("click", startTimer);
+
+applyBoardSizeBtn.addEventListener("click", () => {
+  boardSize = parseInt(boardSizeInput.value) || 3;
+  restartGame();
+});
+
+undoMoveBtn.addEventListener("click", undoMove);
+
+restartBtn.addEventListener("click", restartGame);
+resetScoresBtn.addEventListener("click", resetScores);
+resetHistoryBtn.addEventListener("click", resetHistory);
+toggleThemeBtn.addEventListener("click", toggleTheme);
+
+createBoard(boardSize);
+startTimer();
+
+
+  </script>
+</body>
+</html>
